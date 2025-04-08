@@ -1,0 +1,20 @@
+{
+    "name": "思维快照",
+    "short_name": "swkz",
+    "description": "made by lyh",
+    "icons": [
+        {
+            "src": "33_512*512.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        },
+        {
+            "src": "33-144_144.png",
+            "sizes": "144x144",
+            "type": "image/png"
+        }
+    ],
+    "start_url": ".",
+    "display": "standalone",
+    "theme_color": "white"
+}

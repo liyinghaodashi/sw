@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="./snapshot.css">
+    <link rel="icon" href="./33-144_144.png" type="image/png">
+    <link rel="manifest" href="./manifest.json">
+    <title>思维快照</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            height: 100vh;
+            width: 100vw;
+            background-color: #f0f0f0;
+            overflow: hidden;
+        }
+
+        canvas {
+            background-color: #fff;
+        }
+
+        .controls {
+            position: absolute;
+            top: 0px;
+            left: 0px;
+            margin-top: 10px;
+        }
+
+        p {
+            transition: 0.5s;
+            width: 30px;
+            height: 10px;
+            display: inline-block;
+            margin-right: 0px;
+            cursor: pointer;
+        }
+
+        button,
+        select {
+            padding: 5px 10px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="signature-pad"></canvas>
+    <!-- 控制器 -->
+    <div class="controls">
+        <div style="font-size: 0px;">
+            <!-- <button id="clearColorButton">clock</button> -->
+            <p id="p1" style="background-color: rgb(248, 152.1, 152.1);"></p>
+            <p id="p2" style="background-color: rgb(121.3, 187.1, 255)"></p>
+            <p id="p3" style="background-color: black"></p>
+            <p id="p4" style="background-color: rgb(237.5, 189.9, 118.5)"></p>
+        </div>
+        <div id="sureBox">
+            <div id="yes">Del</div>
+            <div id="no">noDel</div>
+        </div>
+    </div>
+    <div id="snapshot" class="snapshot">
+        <!-- js生成 -->
+    </div>
+    <script src="./log.js"></script>
+    <script src="./clearColor.js"></script>
+    <script>
+        var canvas = document.getElementById('signature-pad')
+        var p1 = document.getElementById('p1')
+        var p2 = document.getElementById('p2')
+        var p3 = document.getElementById('p3')
+        var p4 = document.getElementById('p4')
+        var sureBox = document.getElementById('sureBox')
+        var no = document.getElementById('no')
+        var yes = document.getElementById('yes')
+        no.onclick = function () {
+            sureBox.style.width = '0px'
+        }
+        yes.onclick = function () {
+            const color = sureBox.style.backgroundColor;
+            const rgbValues = color.match(/\d+/g); // 使用正则表达式提取数字
+            if (rgbValues) {
+                const [r, g, b] = rgbValues.map(Number); // 转换为数字
+                console.log("R:", r, "G:", g, "B:", b);
+                clearColor(r, g, b, 10); // 清除红色（RGB: 255, 0, 0），允许误差为10
+            } else {
+                alert('删除发生错误')
+            }
+            sureBox.style.width = '0px'
+        }
+        p1.onclick = function () {
+            if (ctx.strokeStyle == '#f89898') {
+                sureBox.style.backgroundColor = '#f89898'
+                sureBox.style.width = '150px'
+                return
+            }
+            ctx.strokeStyle = 'rgb(248, 152.1, 152.1)';
+            selectStyle(p1)
+        }
+        p2.onclick = function () {
+            if (ctx.strokeStyle == '#79bbff') {
+                sureBox.style.backgroundColor = '#79bbff'
+                sureBox.style.width = '150px'
+                return
+            }
+            ctx.strokeStyle = 'rgb(121.3, 187.1, 255)';
+            selectStyle(p2)
+        }
+        p3.onclick = function () {
+            if (ctx.strokeStyle == '#000000') {
+                sureBox.style.backgroundColor = '#000000'
+                sureBox.style.width = '150px'
+                sureBox.style.color = '#ffffff'
+                return
+            }
+            ctx.strokeStyle = 'black';
+            selectStyle(p3)
+        }
+        p4.onclick = function () {
+            console.log(ctx.strokeStyle);
+            if (ctx.strokeStyle == '#eebe77') {
+                sureBox.style.backgroundColor = '#eebe77'
+                sureBox.style.width = '150px'
+                return
+            }
+            ctx.strokeStyle = 'rgb(237.5, 189.9, 118.5)';
+            selectStyle(p4)
+        }
+        p2.style.width = '60px'
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+        var drawing = false // 标志是否正在绘制
+        var lastX = 0,
+            lastY = 0 // 保存上一个点的坐标
+
+        let ctxSetting = {
+            lineWidth: 4,
+            strokeStyle: 'rgb(121.3, 187.1, 255)',
+            isSelect: "p2"
+        }
+        function initCtx() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            ctx.lineCap = 'round' // 线条末端圆角
+            ctx.lineWidth = ctxSetting.lineWidth // 细线条
+            ctx.strokeStyle = ctxSetting.strokeStyle // 设置画笔颜色
+        }
+        initCtx()
+
+        //记录最大值，只能缩小
+        let maxWidth = window.innerWidth;
+        let maxHeight = window.innerHeight;
+        function resizeCanvans() {
+            const currentWidth = window.innerWidth;
+            const currentHeight = window.innerHeight;
+            if (currentWidth > maxWidth || currentHeight > maxHeight) {
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                initCtx()
+                ctx.putImageData(imageData, 0, 0);
+                maxWidth = currentWidth;
+                maxHeight = currentHeight;
+            }
+        }
+        window.addEventListener('resize', resizeCanvans);
+
+        const history = [];
+        function saveState() {
+            if (history.length > 20) {
+                history.shift(); // 限制保存的状态数量，防止内存占用过多
+            }
+            history.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
+        }
+
+        // 撤销到上一个状态
+        function undo() {
+            if (history.length > 0) {
+                const previousState = history.pop(); // 获取上一个状态
+                ctx.putImageData(previousState, 0, 0); // 恢复画布内容
+            }
+        }
+
+        function selectStyle(selectId) {
+            ctxSetting.isSelect = selectId
+            ctxSetting.strokeStyle = ctx.strokeStyle
+            p1.style.width = '30px'
+            p2.style.width = '30px'
+            p3.style.width = '30px'
+            p4.style.width = '30px'
+            selectId.style.width = '60px'
+        }
+
+        function handleKeyPress(event) {
+            const key = event.key;
+            switch (key) {
+                case '1'://上键
+                    console.log('1');
+                    ctx.strokeStyle = 'rgb(248, 152.1, 152.1)';
+                    selectStyle(p1)
+                    break;
+                case '2':
+                    console.log('2');
+                    ctx.strokeStyle = 'rgb(121.3, 187.1, 255)';
+                    selectStyle(p2)
+                    break;
+                case '3':
+                    console.log('3');
+                    ctx.strokeStyle = 'black';
+                    selectStyle(p3)
+                    break;
+                case '4':
+                    console.log('4');
+                    ctx.strokeStyle = 'rgb(237.5, 189.9, 118.5)';
+                    selectStyle(p4)
+                    break;
+                case 'z':
+                    undo()
+                    break;
+                case 's':
+                    makeItem()
+                    break;
+                case 't':
+                    //清除画布的
+                    ctx.clearRect(0, 0, canvas.width, canvas.height) // 清空整个画布
+                    break;
+            }
+        }
+
+        function initCanvans() {
+            // 开始绘制的函数
+            function startDrawing(e) {
+                e.preventDefault() // 阻止默认行为，避免页面滚动
+                drawing = true // 设置为正在绘制
+                saveState(); // 保存当前状态，便于撤销
+                ctx.beginPath() // 开始新路径
+
+                // 记录初始点的位置
+                const { offsetX, offsetY } = getEventPosition(e)
+                lastX = offsetX
+                lastY = offsetY
+                ctx.moveTo(offsetX, offsetY) // 移动画笔到初始位置
+            }
+
+            // 绘制过程中的函数
+            function draw(e) {
+                e.preventDefault() // 阻止默认行为，避免页面滚动
+                if (!drawing) return // 如果不是在绘制，直接返回
+
+                // 获取当前触点位置
+                const { offsetX, offsetY } = getEventPosition(e)
+
+                // 使用贝塞尔曲线进行平滑过渡绘制
+                ctx.quadraticCurveTo(
+                    lastX,
+                    lastY,
+                    (lastX + offsetX) / 2,
+                    (lastY + offsetY) / 2
+                )
+                ctx.stroke() // 实际绘制路径
+
+                // 更新上一个点的位置
+                lastX = offsetX
+                lastY = offsetY
+            }
+
+            // 停止绘制的函数
+            function stopDrawing(e) {
+                e.preventDefault() // 阻止默认行为
+                drawing = false // 结束绘制状态
+            }
+
+            // 获取事件中触点的相对位置
+            function getEventPosition(e) {
+                // 鼠标事件或者触摸事件中的坐标
+                const offsetX = e.offsetX || e.touches[0].clientX - canvas.offsetLeft
+                const offsetY = e.offsetY || e.touches[0].clientY - canvas.offsetTop
+                return { offsetX, offsetY }
+            }
+
+            // 鼠标事件绑定
+            canvas.addEventListener('mousedown', startDrawing) // 鼠标按下开始绘制
+            canvas.addEventListener('mousemove', draw) // 鼠标移动时绘制
+            canvas.addEventListener('mouseup', stopDrawing) // 鼠标抬起停止绘制
+            canvas.addEventListener('mouseout', stopDrawing) // 鼠标移出画布停止绘制
+
+            // 触摸事件绑定
+            canvas.addEventListener('touchstart', startDrawing) // 触摸开始绘制
+            canvas.addEventListener('touchmove', draw) // 触摸移动时绘制
+            canvas.addEventListener('touchend', stopDrawing) // 触摸结束时停止绘制
+            canvas.addEventListener('touchcancel', stopDrawing) // 触摸取消时停止绘制
+
+        }
+        document.addEventListener('keydown', handleKeyPress);
+        document.addEventListener('DOMContentLoaded', initCanvans)
+
+        // 将快照恢复到画布
+        function restoreItem(image) {
+            // 清空画布，防止重叠
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            // 将图像绘制到画布上
+            ctx.drawImage(image, 0, 0);
+        }
+        // 生成快照
+        const snapshotBox = document.getElementById("snapshot");
+        function makeItem() {
+            const dataURL = canvas.toDataURL('image/png');
+            const snapshotItem = document.createElement("div");
+            snapshotItem.style.backgroundImage = `url(${dataURL})`;
+            snapshotItem.onclick = function () {
+                const image = new Image();
+                image.src = dataURL;
+                image.onload = function () {
+                    restoreItem(image);
+                }
+            }
+            snapshotBox.appendChild(snapshotItem);
+        }
+
+    </script>
+    <script src="./main.js"></script>
+</body>
+
+</html>
